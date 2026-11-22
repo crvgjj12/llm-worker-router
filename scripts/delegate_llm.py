@@ -9,7 +9,10 @@ import json
 import os
 import random
 import re
+import shutil
 import socket
+import ssl
+import subprocess
 import sys
 import time
 import urllib.error
@@ -44,6 +47,7 @@ TASK_CASCADES: dict[str, list[tuple[str, str]]] = {
         ("groq", "qwen/qwen3.8-27b"),
         ("cloudflare", "@cf/qwen/qwen2.5-coder-32b-instruct"),
         ("github", "openai/gpt-4.1-mini"),
+        ("openference", "DeepSeek-V4.1-Flash-1017-Free"),
         ("openrouter", "openrouter/free"),
         ("ollama", "qwen2.5-coder:7b"),
         ("cerebras", "qwen-3.8-27b"),
@@ -86,6 +90,7 @@ TASK_CASCADES: dict[str, list[tuple[str, str]]] = {
         ("nvidia", "nvidia/nemotron-3-ultra-550b-a55b"),
         ("nvidia", "mistralai/mistral-large-4-1t-a52b"),
         ("gemini", "gemini-3-flash-preview"),
+        ("openference", "GLM-5.3-Flash-Free"),
         ("github", "deepseek/deepseek-r1"),
         ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free"),
         ("ollama", "qwen3.6:35b-a3b"),
@@ -93,6 +98,7 @@ TASK_CASCADES: dict[str, list[tuple[str, str]]] = {
     ],
     "fallback-cloud": [
         ("openrouter", "openrouter/free"),
+        ("openference", "DeepSeek-V4.1-Flash-1017-Free"),
         ("github", "openai/gpt-4.1"),
         ("cloudflare", "@cf/qwen/qwen2.5-coder-32b-instruct"),
         ("opencode", "big-pickle"),
@@ -116,6 +122,8 @@ DEFAULT_PROVIDER_MODELS = {
     "github": "openai/gpt-4o-mini",
     "openrouter": "openrouter/free",
     "opencode": "big-pickle",
+    "openference": "DeepSeek-V4.1-Flash-1017-Free",
+    "venice": "venice-uncensored",
     "freebuff": "freebuff-tui",
 }
 
@@ -130,6 +138,8 @@ ALL_PROVIDERS = [
     "github",
     "openrouter",
     "opencode",
+    "openference",
+    "venice",
     "freebuff",
 ]
 
@@ -177,24 +187,110 @@ def get_key_pool(prefix: str) -> list[str]:
     return keys
 
 
+def _parse_sse_response(raw: str) -> dict:
+    """Assemble OpenAI-compatible SSE stream chunks into a single response dict."""
+    content_parts: list[str] = []
+    reasoning_parts: list[str] = []
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s.startswith("data:") or s == "data: [DONE]":
+            continue
+        try:
+            obj = json.loads(s[5:].strip())
+        except json.JSONDecodeError:
+            continue
+        choices = obj.get("choices") or []
+        if not choices:
+            continue
+        delta = choices[0].get("delta") or choices[0].get("message") or {}
+        if delta.get("content"):
+            content_parts.append(str(delta["content"]))
+        if delta.get("reasoning_content"):
+            reasoning_parts.append(str(delta["reasoning_content"]))
+    return {
+        "choices": [
+            {
+                "message": {
+                    "content": "".join(content_parts).strip(),
+                    "reasoning_content": "".join(reasoning_parts).strip(),
+                }
+            }
+        ]
+    }
+
+
+def _curl_post_json(
+    url: str,
+    payload_bytes: bytes,
+    headers: dict[str, str],
+    timeout: int,
+    stream: bool,
+) -> dict:
+    """Fallback HTTPS POST using system curl (native OS TLS store, e.g. SChannel)."""
+    curl_bin = shutil.which("curl.exe") or shutil.which("curl")
+    if not curl_bin:
+        raise RuntimeError("curl não encontrado para fallback TLS do sistema.")
+    cmd = [curl_bin, "-sS", "-m", str(timeout), "-w", "\n%{http_code}", "-X", "POST", url]
+    if stream:
+        cmd.append("-N")
+    for k, v in headers.items():
+        cmd.extend(["-H", f"{k}: {v}"])
+    cmd.extend(["--data-binary", "@-"])
+    proc = subprocess.run(
+        cmd,
+        input=payload_bytes.decode("utf-8"),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout + 10,
+    )
+    if proc.returncode != 0 and not proc.stdout:
+        raise RuntimeError(f"curl falhou (exit {proc.returncode}): {proc.stderr.strip()[:200]}")
+    parts = proc.stdout.rsplit("\n", 1)
+    body = parts[0] if len(parts) == 2 else proc.stdout
+    code_str = parts[1].strip() if len(parts) == 2 else "0"
+    status_code = int(code_str) if code_str.isdigit() else 0
+    if status_code >= 400 or status_code == 0:
+        raise urllib.error.HTTPError(url, status_code, body[:200], None, None)
+    if stream or body.lstrip().startswith("data:"):
+        return _parse_sse_response(body)
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError:
+        stripped = body.strip()
+        if stripped and not stripped.lstrip().startswith("<"):
+            return {"choices": [{"message": {"content": stripped}}]}
+        raise
+
+
 def http_post_json(
     url: str,
     payload: dict,
     headers: dict[str, str] | None = None,
     timeout: int = 600,
+    stream: bool = False,
 ) -> dict:
-    """POST JSON payload and return decoded JSON response."""
+    """POST JSON payload and return decoded JSON (or assembled SSE) response."""
     req_headers = {
         "Content-Type": "application/json",
-        "Accept": "application/json",
+        "Accept": "text/event-stream" if stream else "application/json",
         "User-Agent": "llm-worker-router/2.0",
     }
     if headers:
         req_headers.update(headers)
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers=req_headers, method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        raw = resp.read().decode("utf-8", errors="replace")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason, ssl.SSLCertVerificationError) or "CERTIFICATE_VERIFY_FAILED" in str(exc.reason):
+            return _curl_post_json(url, data, req_headers, timeout=timeout, stream=stream)
+        raise
+
+    if stream or raw.lstrip().startswith("data:"):
+        return _parse_sse_response(raw)
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
@@ -455,6 +551,10 @@ def resolve_provider_spec(provider: str) -> tuple[list[str], str, dict[str, str]
         )
     if provider == "opencode":
         return (["https://opencode.ai/zen/v1/chat/completions"], "OPENCODE_API_KEY", {})
+    if provider == "openference":
+        return (["https://api.openference.com/v1/chat/completions"], "OPENFERENCE_API_KEY", {})
+    if provider == "venice":
+        return (["https://api.venice.ai/api/v1/chat/completions"], "VENICE_API_KEY", {})
     raise ValueError(f"Provedor não suportado: {provider}")
 
 
@@ -478,19 +578,22 @@ def call_openai_compatible(
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
 
+    use_stream = provider == "openference"
     payload = {
         "model": model,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+    if use_stream:
+        payload["stream"] = True
 
     errors: list[str] = []
     for endpoint in endpoints:
         for attempt, api_key in enumerate(keys, start=1):
             headers = {"Authorization": f"Bearer {api_key}", **extra_headers}
             try:
-                res = http_post_json(endpoint, payload, headers=headers, timeout=timeout)
+                res = http_post_json(endpoint, payload, headers=headers, timeout=timeout, stream=use_stream)
                 choices = res.get("choices") or []
                 if not choices:
                     raise RuntimeError("Resposta sem campo 'choices'.")
@@ -635,30 +738,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_env_candidates() -> None:
-    """Load env files in priority order without overriding already-set variables:
-    1. Already exported environment variables (os.environ)
-    2. .env in current working directory (Path.cwd() / ".env")
-    3. .env in skill root directory (Path(__file__).resolve().parent.parent / ".env")
-    4. Global ~/.llm-router.env (Path.home() / ".llm-router.env")
-    """
-    skill_root = Path(__file__).resolve().parent.parent
-    candidates = [
-        Path.cwd() / ".env",
-        skill_root / ".env",
-        Path.home() / ".llm-router.env",
-    ]
-    seen: set[Path] = set()
-    for path in candidates:
-        resolved = path.resolve()
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        load_env_file(path)
-
-
 def main() -> int:
-    load_env_candidates()
+    load_env_file(Path.home() / ".llm-router.env")
     args = parse_args()
 
     if args.check_ollama:

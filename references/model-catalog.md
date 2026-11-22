@@ -84,12 +84,28 @@ Catálogo validado ao vivo em `2026-11-21` contra Ollama local e os 8 provedores
 | `nvidia/nemotron-3.5-super-vl:free` | `openrouter` | `0.75s` | `600s` | 120B MoE gratuito para análise geral. |
 | `baidu/ernie-5.5-flash-preview:free` | `openrouter` | `1.27s` | `600s` | Flash gratuito alternativo para texto e resumos. |
 
-## 9. OpenCode Zen/Go (`opencode`) & Freebuff CLI
+## 9. Openference (`https://api.openference.com/v1`)
+
+> **Nota técnica**: Os modelos gratuitos `-Free` exigem `stream: true` (SSE); `delegate_llm.py` ativa streaming automaticamente para `openference` e usa o store TLS nativo do sistema via `curl` se o Python OpenSSL falhar na cadeia intermediária.
+
+| Model ID exato | Provedor | Latência medida | Timeout | Bizu de Uso (Especialidade) |
+| :--- | :--- | :--- | :--- | :--- |
+| `DeepSeek-V4.1-Flash-1017-Free` | `openference` | `2.05s` | `600s` | **Padrão `--provider openference`**: fallback em `code` e `fallback-cloud`; código e raciocínio rápido gratuito via SSE. |
+| `GLM-5.3-Flash-Free` | `openference` | `2.80s` | `600s` | **Fallback em `reason`**: modelo GLM com *reasoning* gratuito via SSE. |
+
+*(Os demais 49 modelos listados em `/v1/models` na Openference retornaram `HTTP 402` exigindo créditos pagos.)*
+
+## 10. Venice AI (`https://api.venice.ai/api/v1`) — Zero Data Retention (Pendente de Créditos)
+
+- **Política de Privacidade**: A Venice AI opera com política **Zero Data Retention** (prompts e respostas não são armazenados nem usados para treinamento nos modelos privados/uncensored).
+- **Status na conta (`2026-11-22`)**: `/models` retornou `HTTP 200` (`148` modelos, incluindo `venice-uncensored`, `gemini-4-carbon`, `qwen3-coder-480b-a35b-instruct-turbo`), porém todas as chamadas de inferência retornaram **`HTTP 402`** (`Insufficient USD or Diem balance`). Pronto para uso imediato via `--provider venice` assim que houver saldo USD ou Diem na conta.
+
+## 11. OpenCode Zen/Go (`opencode`) & Freebuff CLI
 
 - **OpenCode Zen (`opencode`)**: A chave `OPENCODE_API_KEY_1` e o endpoint `https://opencode.ai/zen/v1` estão ativos (`39` modelos listados em `/models`, incluindo `big-pickle`, `beam-free`, `mimo-v2.6-flash-free`, `deepseek-v4.1-flash-free`, `flint-40b-free`, `nemotron-3.5-super-vl-free`, `jev-1.13-free`, `nemotron-3.5-lightning-free`). No teste ao vivo de `2026-11-21`, os modelos `-free` retornaram `HTTP 429 FreeUsageLimitError` (cota gratuita atingida na conta) e os modelos pagos retornaram `HTTP 402 Insufficient balance`. A rota `--task opencode-go` tenta `opencode/big-pickle` e faz **fallback automático** para `openrouter/free` → `ollama/qwen3.5:4b`.
 - **Freebuff CLI (`freebuff`)**: Quando instalado globalmente via npm (`freebuff`), `freebuff --help` confirma apenas uso interativo (`login`, `--continue`, `--cwd`, `--trust-agents`), **sem flag headless/não-interativa** (`-p` / `--print`). Não integrado como worker CLI em `delegate_llm.py`.
 
-## 10. Indisponíveis / Deprecados na Conta (NÃO CHAMAR)
+## 12. Indisponíveis / Deprecados na Conta (NÃO CHAMAR)
 
 - **Groq (`404`)**: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `minimaxai/minimax-m2.7`, `meta-llama/muse-spark-open`.
 - **Cerebras (`404`)**: `llama3.1-8b`, `llama-3.3-70b`, `qwen-3-32b`, `zai-glm-4.7`.

@@ -90,7 +90,9 @@ Você não precisa configurar todos — preencha apenas os que desejar em `~/.ll
 5. **GitHub Models (`GITHUB_API_KEY_1`)**: acesse [github.com/settings/tokens](https://github.com/settings/tokens) (**Personal access tokens → Fine-grained tokens** ou Classic), crie um token com permissão de leitura para **Models** (`models:read`) e cole em `GITHUB_API_KEY_1`.
 6. **OpenRouter (`OPENROUTER_API_KEY_1..9`)**: acesse [openrouter.ai/keys](https://openrouter.ai/keys), clique em **Create Key** e copie a chave (funciona inclusive com modelos `:free` e `openrouter/free` sem saldo pago).
 7. **OpenCode Zen / Go (`OPENCODE_API_KEY_1..9`)**: acesse [opencode.ai](https://opencode.ai) / console do OpenCode Zen, gere sua chave de API na seção de credenciais e salve em `OPENCODE_API_KEY_1`.
-8. **Cerebras (`CEREBRAS_API_KEY_1..9`)**: acesse [cloud.cerebras.ai](https://cloud.cerebras.ai), crie sua conta e gere a chave em **API Keys** (usada apenas como último recurso pós-Ollama no modo `auto`).
+8. **Openference (`OPENFERENCE_API_KEY_1..9`)**: acesse [openference.com](https://openference.com), gere sua chave de API e salve em `OPENFERENCE_API_KEY_1` (`DeepSeek-V4.1-Flash-1017-Free` e `GLM-5.3-Flash-Free` funcionam gratuitamente via streaming SSE).
+9. **Venice AI (`VENICE_API_KEY_1..9`)**: acesse [venice.ai/settings/api](https://venice.ai/settings/api), gere sua chave (política **Zero Data Retention**) e salve em `VENICE_API_KEY_1` (requer saldo USD ou Diem para inferência).
+10. **Cerebras (`CEREBRAS_API_KEY_1..9`)**: acesse [cloud.cerebras.ai](https://cloud.cerebras.ai), crie sua conta e gere a chave em **API Keys** (usada apenas como último recurso pós-Ollama no modo `auto`).
 
 ## Como Adicionar Novos Provedores (ou APIs Pagas)
 
