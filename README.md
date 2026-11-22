@@ -79,6 +79,49 @@ ollama pull qwen3.6:35b-a3b
 | `qwen3-embedding:0.6b` | Padrão exclusivo de `--task embed` | Gera vetores de `1024` dimensões com pegada mínima de memória (~0.6B), permitindo indexação semântica local quase instantânea. |
 | `qwen3.6:35b-a3b` | Padrão de `--task local-heavy` e fallback local de `reason` | Arquitetura MoE (*Mixture-of-Experts* com apenas 3B de parâmetros ativos por token sobre 35B totais), entregando raciocínio local de alta qualidade com uso viável em máquinas de 8 GB VRAM + 32 GB RAM. |
 
+## Como Obter as API Keys dos Provedores
+
+Você não precisa configurar todos — preencha apenas os que desejar em `~/.llm-router.env`. Provedores com pool aceitam de `_1` até `_9` (ex.: `GROQ_API_KEY_1`, `GROQ_API_KEY_2`):
+
+1. **Groq (`GROQ_API_KEY_1..9`)**: acesse [console.groq.com/keys](https://console.groq.com/keys), faça login, clique em **Create API Key** e copie a chave.
+2. **Google AI Studio / Gemini (`GEMINI_API_KEY_1..9`)**: acesse [aistudio.google.com/apikey](https://aistudio.google.com/apikey), clique em **Create API key**, selecione/crie um projeto Google Cloud e copie a chave (você pode gerar até 5+ chaves em projetos distintos para ampliar a cota).
+3. **NVIDIA NIM (`NVIDIA_API_KEY_1..9`)**: acesse [build.nvidia.com](https://build.nvidia.com), entre com sua conta NVIDIA, abra qualquer modelo, clique em **Get API Key** → **Generate Key**.
+4. **Cloudflare Workers AI (`CLOUDFLARE_API_KEY_1` e `CLOUDFLARE_ACCOUNT_ID`)**: acesse [dash.cloudflare.com](https://dash.cloudflare.com), copie o **Account ID** na barra lateral direita de **Workers & Pages** e crie um token em **My Profile → API Tokens → Create Token** usando o template **Workers AI**.
+5. **GitHub Models (`GITHUB_API_KEY_1`)**: acesse [github.com/settings/tokens](https://github.com/settings/tokens) (**Personal access tokens → Fine-grained tokens** ou Classic), crie um token com permissão de leitura para **Models** (`models:read`) e cole em `GITHUB_API_KEY_1`.
+6. **OpenRouter (`OPENROUTER_API_KEY_1..9`)**: acesse [openrouter.ai/keys](https://openrouter.ai/keys), clique em **Create Key** e copie a chave (funciona inclusive com modelos `:free` e `openrouter/free` sem saldo pago).
+7. **OpenCode Zen / Go (`OPENCODE_API_KEY_1..9`)**: acesse [opencode.ai](https://opencode.ai) / console do OpenCode Zen, gere sua chave de API na seção de credenciais e salve em `OPENCODE_API_KEY_1`.
+8. **Cerebras (`CEREBRAS_API_KEY_1..9`)**: acesse [cloud.cerebras.ai](https://cloud.cerebras.ai), crie sua conta e gere a chave em **API Keys** (usada apenas como último recurso pós-Ollama no modo `auto`).
+
+## Como Adicionar Novos Provedores (ou APIs Pagas)
+
+Qualquer API compatível com o padrão **OpenAI Chat Completions** (`/v1/chat/completions`) — como **OpenAI**, **DeepSeek direto**, **Together AI**, **Fireworks** ou endpoints pagos — pode ser adicionada em 4 passos:
+
+1. **Adicione a variável de ambiente** em `~/.llm-router.env` (e opcionalmente em `.env.example`):
+
+   ```env
+   DEEPSEEK_API_KEY_1=sua_chave_aqui
+   ```
+
+2. **Registre o provedor em `scripts/delegate_llm.py`**:
+   - Inclua o nome do provedor em `ALL_PROVIDERS` e seu modelo padrão em `DEFAULT_PROVIDER_MODELS`:
+     ```python
+     ALL_PROVIDERS = [..., "deepseek"]
+     DEFAULT_PROVIDER_MODELS = {..., "deepseek": "deepseek-chat"}
+     ```
+   - Adicione o endpoint e o prefixo da chave em `resolve_provider_spec(provider)`:
+     ```python
+     if provider == "deepseek":
+         return (["https://api.deepseek.com/v1/chat/completions"], "DEEPSEEK_API_KEY", {})
+     ```
+
+3. **(Opcional) Inclua na cascata `--provider auto`**: adicione `("deepseek", "deepseek-chat")` na posição desejada dentro de `TASK_CASCADES` (por exemplo, em `reason` ou `code`), sempre mantendo `ollama` e `cerebras` no final se quiser preservar o fallback gratuito/local.
+
+4. **Teste a integração**:
+
+   ```bash
+   python scripts/delegate_llm.py --provider deepseek --prompt "Responda apenas: OK"
+   ```
+
 ## Instalação nos Agentes
 
 Copie a pasta `llm-worker-router` para o diretório global de skills do(s) seu(s) agente(s):
