@@ -14,14 +14,14 @@ Skill portável (Windows, Linux e macOS) e zero-dependências em Python 3 (`stdl
 
 | `--task` | 1º Alvo (Primário) | Cascata de Fallback | Uso Principal |
 | :--- | :--- | :--- | :--- |
-| `summarize` | `groq/qwen/qwen3.8-27b` | `gemini` → `openrouter` → `cloudflare` → `ollama` → `cerebras` | Resumir logs e arquivos grandes (`--file`) |
-| `code` | `groq/qwen/qwen3.8-27b` | `cloudflare` → `github` → `openrouter` → `ollama` → `cerebras` | Gerar código, docstrings e testes |
-| `fast-cloud` | `groq/qwen/qwen3.8-27b` | `openrouter` → `gemini` → `ollama` → `cerebras` | Tarefas rápidas em nuvem |
-| `batch-cloud` | `groq/openai/gpt-oss-120b` | `gemini` → `openrouter` → `ollama` → `cerebras` | Lotes e síntese rápida |
+| `summarize` | `groq/qwen/qwen3.8-27b` | `groq` → `cloudflare` → `openrouter` → `openference` → `commandcode` → `github` → `gemini` → `ollama` → `cerebras` | Resumir logs e arquivos grandes (`--file`) |
+| `code` | `commandcode/deepseek/deepseek-v4.1-flash` | `groq` → `cloudflare` → `github` → `openrouter` → `openference` → `gemini` → `ollama` → `cerebras` | Gerar código, docstrings e testes |
+| `fast-cloud` | `groq/qwen/qwen3.8-27b` | `cloudflare` → `openrouter` → `openference` → `commandcode` → `gemini` → `ollama` → `cerebras` | Tarefas rápidas em nuvem |
+| `batch-cloud` | `groq/openai/gpt-oss-120b` | `cloudflare` → `openrouter` → `gemini` → `ollama` → `cerebras` | Lotes e síntese rápida |
 | `long-ctx` | `gemini/gemini-3-flash-preview` | `nvidia` → `openrouter` → `ollama` → `cerebras` | Contexto longo (pool de 5 chaves Gemini) |
-| `reason` | `nvidia/nvidia/nemotron-3-ultra-550b-a55b` | `nvidia` → `gemini` → `github` → `openrouter` → `ollama` → `cerebras` | Auditoria e segunda opinião profunda |
+| `reason` | `nvidia/nvidia/nemotron-3-ultra-550b-a55b` | `nvidia` → `github` → `commandcode` → `openference` → `venice` → `gemini` → `ollama` → `cerebras` | Auditoria e segunda opinião profunda |
 | `opencode-go` | `opencode/big-pickle` | `openrouter` → `ollama` → `cerebras` | Modelos OpenCode Zen |
-| `fallback-cloud` | `openrouter/openrouter/free` | `github` → `cloudflare` → `opencode` → `ollama` → `cerebras` | Rede de segurança multi-provedor |
+| `fallback-cloud` | `openrouter/openrouter/free` | `openference` → `github` → `cloudflare` → `commandcode` → `opencode` → `ollama` → `cerebras` | Rede de segurança multi-provedor |
 | `embed` | `ollama/qwen3-embedding:0.6b` | — | Embeddings locais (`1024` dims) |
 | `local-heavy` | `ollama/qwen3.6:35b-a3b` | `gemini` → `openrouter` → `cerebras` | Raciocínio local pesado |
 
@@ -92,7 +92,8 @@ Você não precisa configurar todos — preencha apenas os que desejar em `~/.ll
 7. **OpenCode Zen / Go (`OPENCODE_API_KEY_1..9`)**: acesse [opencode.ai](https://opencode.ai) / console do OpenCode Zen, gere sua chave de API na seção de credenciais e salve em `OPENCODE_API_KEY_1`.
 8. **Openference (`OPENFERENCE_API_KEY_1..9`)**: acesse [openference.com](https://openference.com), gere sua chave de API e salve em `OPENFERENCE_API_KEY_1` (`DeepSeek-V4.1-Flash-1017-Free` e `GLM-5.3-Flash-Free` funcionam gratuitamente via streaming SSE).
 9. **Venice AI (`VENICE_API_KEY_1..9`)**: acesse [venice.ai/settings/api](https://venice.ai/settings/api), gere sua chave (política **Zero Data Retention**) e salve em `VENICE_API_KEY_1` (requer saldo USD ou Diem para inferência).
-10. **Cerebras (`CEREBRAS_API_KEY_1..9`)**: acesse [cloud.cerebras.ai](https://cloud.cerebras.ai), crie sua conta e gere a chave em **API Keys** (usada apenas como último recurso pós-Ollama no modo `auto`).
+10. **Command Code Goat (`COMMANDCODE_API_KEY_1..9`)**: gere sua chave na Command Code e salve em `COMMANDCODE_API_KEY_1` (no roteador, `--provider commandcode` é **restrito exclusivamente** ao modelo `deepseek/deepseek-v4.1-flash`).
+11. **Cerebras (`CEREBRAS_API_KEY_1..9`)**: acesse [cloud.cerebras.ai](https://cloud.cerebras.ai), crie sua conta e gere a chave em **API Keys** (usada apenas como último recurso pós-Ollama no modo `auto`).
 
 ## Como Adicionar Novos Provedores (ou APIs Pagas)
 
@@ -136,6 +137,9 @@ Copie a pasta `llm-worker-router` para o diretório global de skills do(s) seu(s
 ## Exemplos de Uso CLI
 
 ```bash
+# Listar toda a frota de provedores e modelos disponíveis
+python ~/.agents/skills/llm-worker-router/scripts/delegate_llm.py --list-models
+
 # Resumir arquivo grande em nuvem (cloud-first)
 python ~/.agents/skills/llm-worker-router/scripts/delegate_llm.py --provider auto --task summarize --file app.log --prompt "Resuma os erros críticos."
 

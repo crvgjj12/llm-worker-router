@@ -11,23 +11,31 @@ description: >-
 
 Skill para delegar subtarefas pesadas, repetitivas ou de leitura extensa a workers LLM externos/locais via CLI zero-dependências (`scripts/delegate_llm.py`), mantendo o contexto do agente principal limpo e com fallback em cascata no modo `--provider auto`.
 
+## Diretriz Anti-Fixação & Frota Completa (`--list-models`)
+
+> **Você tem um mar de modelos gratuitos à disposição** (`groq`, `cloudflare`, `commandcode`, `github`, `openrouter`, `openference`, `nvidia`, `venice`, `opencode`, `gemini`, `ollama`, `cerebras`). **NÃO fique chamando apenas Gemini ou Ollama.** Use modelos leves/rápidos (`qwen/qwen3.8-27b`, `Llama 3.3 70B`, `Qwen 2.5 Coder 32B`, `GPT-4.1-mini`, `DeepSeek V4.1 Flash`) para tarefas básicas e código; reserve **Gemini** para contexto gigante (`--task long-ctx`) e **Ollama** para privacidade/offline (`--provider ollama`), `--task embed` ou fallback final.
+>
+> Execute `python <SKILL_DIR>/scripts/delegate_llm.py --list-models` para inspecionar toda a frota em JSON a qualquer momento.
+>
+> **Restrição estrita**: `--provider commandcode` aceita **exclusivamente** `deepseek/deepseek-v4.1-flash` (qualquer outro `--model` é rejeitado com `exit code 2`).
+
 ## Matriz de Rotas (`--provider auto --task <TASK>`) — Cloud-First
 
 > **Regra Cloud-First**: Sempre use `--provider auto` (nuvem primeiro). Reserve `--provider ollama` estritamente para **dados sensíveis/privados (offline)**, `--task embed` ou fallback final quando toda a nuvem falhar.
 
 | `--task` | 1º Alvo (Primário) | Cascata de Fallback Automático | Uso Recomendado |
 | :--- | :--- | :--- | :--- |
-| `summarize` | `groq/qwen/qwen3.8-27b` | `gemini/gemini-3-flash-preview` → `openrouter/openrouter/free` → `cloudflare/@cf/meta/llama-3.3-70b-instruct-fp8-fast` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Resumir logs, diffs e arquivos grandes (>300 linhas) em nuvem |
-| `code` | `groq/qwen/qwen3.8-27b` | `cloudflare/@cf/qwen/qwen2.5-coder-32b-instruct` → `github/openai/gpt-4.1-mini` → `openference/DeepSeek-V4.1-Flash-1017-Free` → `openrouter/openrouter/free` → `ollama/qwen2.5-coder:7b` → `cerebras/qwen-3.8-27b` | Gerar código, scripts, docstrings e testes unitários em nuvem |
+| `summarize` | `groq/qwen/qwen3.8-27b` | `groq/openai/gpt-oss-120b` → `cloudflare/@cf/meta/llama-3.3-70b-instruct-fp8-fast` → `openrouter/openrouter/free` → `openference/DeepSeek-V4.1-Flash-1017-Free` → `commandcode/deepseek/deepseek-v4.1-flash` → `github/openai/gpt-4.1-mini` → `gemini/gemini-3-flash-preview` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Resumir logs, diffs e arquivos grandes (>300 linhas) em nuvem |
+| `code` | `commandcode/deepseek/deepseek-v4.1-flash` | `groq/qwen/qwen3.8-27b` → `cloudflare/@cf/qwen/qwen2.5-coder-32b-instruct` → `github/openai/gpt-4.1-mini` → `openrouter/openrouter/free` → `openference/DeepSeek-V4.1-Flash-1017-Free` → `gemini/gemini-3-flash-preview` → `ollama/qwen2.5-coder:7b` → `cerebras/qwen-3.8-27b` | Gerar código, scripts, docstrings e testes unitários em nuvem |
 | `embed` | `ollama/qwen3-embedding:0.6b` | — | Gerar vetores de embedding (`1024` dims) em JSON (local) |
 | `local-heavy` | `ollama/qwen3.6:35b-a3b` | `gemini/gemini-3-flash-preview` → `openrouter/openrouter/free` → `cerebras/gpt-oss-120b` | Raciocínio local pesado (quando solicitado explicitamente) |
-| `fast-cloud` | `groq/qwen/qwen3.8-27b` | `openrouter/openrouter/free` → `gemini/gemini-3.1-flash-lite-preview` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Inferência rápida na nuvem (`0.25s`) |
-| `batch-cloud` | `groq/openai/gpt-oss-120b` | `gemini/gemini-3-flash-preview` → `openrouter/openrouter/free` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Processamento em lote e síntese rápida |
-| `long-ctx` | `gemini/gemini-3-flash-preview` | `nvidia/moonshotai/kimi-k3.1-pro` → `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Contexto longo (5 chaves Gemini em rotação) |
+| `fast-cloud` | `groq/qwen/qwen3.8-27b` | `cloudflare/@cf/meta/llama-3.3-70b-instruct-fp8-fast` → `openrouter/openrouter/free` → `openference/DeepSeek-V4.1-Flash-1017-Free` → `commandcode/deepseek/deepseek-v4.1-flash` → `gemini/gemini-3.1-flash-lite-preview` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Inferência rápida na nuvem (`0.25s`) |
+| `batch-cloud` | `groq/openai/gpt-oss-120b` | `cloudflare/@cf/meta/llama-3.3-70b-instruct-fp8-fast` → `openrouter/openrouter/free` → `gemini/gemini-3-flash-preview` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Processamento em lote e síntese rápida |
+| `long-ctx` | `gemini/gemini-3-flash-preview` | `nvidia/moonshotai/kimi-k3.1-pro` → `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Contexto longo (1M+ tokens, 5 chaves Gemini) |
 | `opencode-go` | `opencode/big-pickle` | `openrouter/openrouter/free` → `ollama/qwen3.5:4b` → `cerebras/qwen-3.8-27b` | Modelos OpenCode Zen com fallback gratuito |
-| `reason` | `nvidia/nvidia/nemotron-3-ultra-550b-a55b` | `nvidia/mistralai/mistral-large-4-1t-a52b` → `gemini/gemini-3-flash-preview` → `openference/GLM-5.3-Flash-Free` → `github/deepseek/deepseek-r1` → `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free` → `ollama/qwen3.6:35b-a3b` → `cerebras/gpt-oss-120b` | Auditoria arquitetural e raciocínio profundo |
-| `fallback-cloud` | `openrouter/openrouter/free` | `openference/DeepSeek-V4.1-Flash-1017-Free` → `github/openai/gpt-4.1` → `cloudflare/@cf/qwen/qwen2.5-coder-32b-instruct` → `opencode/big-pickle` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Rede de segurança multi-provedor gratuita |
-| `general` | `groq/qwen/qwen3.8-27b` | `gemini/gemini-3-flash-preview` → `openrouter/openrouter/free` → `cloudflare/@cf/meta/llama-3.3-70b-instruct-fp8-fast` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Tarefas gerais com fallback completo |
+| `reason` | `nvidia/nvidia/nemotron-3-ultra-550b-a55b` | `nvidia/mistralai/mistral-large-4-1t-a52b` → `github/deepseek/deepseek-r1` → `commandcode/deepseek/deepseek-v4.1-flash` → `openference/GLM-5.3-Flash-Free` → `venice/venice-uncensored` → `gemini/gemini-3-flash-preview` → `ollama/qwen3.6:35b-a3b` → `cerebras/gpt-oss-120b` | Auditoria arquitetural e raciocínio profundo |
+| `fallback-cloud` | `openrouter/openrouter/free` | `openference/DeepSeek-V4.1-Flash-1017-Free` → `github/openai/gpt-4.1` → `cloudflare/@cf/qwen/qwen2.5-coder-32b-instruct` → `commandcode/deepseek/deepseek-v4.1-flash` → `opencode/big-pickle` → `ollama/qwen3.5:4b` → `cerebras/gpt-oss-120b` | Rede de segurança multi-provedor gratuita |
+| `general` | `groq/qwen/qwen3.8-27b` | Mesma cascata de `summarize` | Tarefas gerais com fallback completo |
 
 > **Regra do Cerebras**: Em `--provider auto`, o `cerebras` é usado **EXCLUSIVAMENTE como último recurso pós-Ollama** (somente se os provedores primários E o `ollama` local falharem, ou quando chamado explicitamente com `--provider cerebras`).
 
@@ -52,7 +60,10 @@ python "<SKILL_DIR>\scripts\delegate_llm.py" --provider auto --task long-ctx --f
 # Auditoria profunda via NVIDIA NIM
 python "<SKILL_DIR>\scripts\delegate_llm.py" --provider auto --task reason --prompt "Revise esta arquitetura."
 
-# Provedor explícito
+# Provedores explícitos (exemplos diretos)
+python "<SKILL_DIR>\scripts\delegate_llm.py" --list-models
+python "<SKILL_DIR>\scripts\delegate_llm.py" --provider commandcode --prompt "Refatore esta função."
+python "<SKILL_DIR>\scripts\delegate_llm.py" --provider cloudflare --model "@cf/qwen/qwen2.5-coder-32b-instruct" --prompt "Escreva testes."
 python "<SKILL_DIR>\scripts\delegate_llm.py" --provider github --model "openai/gpt-4.1-mini" --prompt "Explique este trecho."
 ```
 
@@ -60,7 +71,8 @@ python "<SKILL_DIR>\scripts\delegate_llm.py" --provider github --model "openai/g
 
 | Flag | Valores / Descrição | Padrão |
 | :--- | :--- | :--- |
-| `--provider` | `auto`, `ollama`, `groq`, `nvidia`, `cerebras`, `gemini`, `cloudflare`, `github`, `openrouter`, `opencode`, `openference`, `venice` | `auto` |
+| `--provider` | `auto`, `ollama`, `groq`, `nvidia`, `cerebras`, `gemini`, `cloudflare`, `github`, `openrouter`, `opencode`, `openference`, `venice`, `commandcode` | `auto` |
+| `--list-models` | Lista todos os provedores configurados e seus modelos disponíveis em JSON | `false` |
 | `--task` | `summarize`, `code`, `embed`, `local-heavy`, `fast-cloud`, `batch-cloud`, `long-ctx`, `opencode-go`, `reason`, `fallback-cloud` | `summarize` |
 | `--file` | Caminho de arquivo local lido pelo script (pode repetir) | — |
 | `--prompt` | Instrução para o modelo worker | — |

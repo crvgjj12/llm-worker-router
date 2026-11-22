@@ -100,12 +100,20 @@ Catálogo validado ao vivo em `2026-11-21` contra Ollama local e os 8 provedores
 - **Política de Privacidade**: A Venice AI opera com política **Zero Data Retention** (prompts e respostas não são armazenados nem usados para treinamento nos modelos privados/uncensored).
 - **Status na conta (`2026-11-22`)**: `/models` retornou `HTTP 200` (`148` modelos, incluindo `venice-uncensored`, `gemini-4-carbon`, `qwen3-coder-480b-a35b-instruct-turbo`), porém todas as chamadas de inferência retornaram **`HTTP 402`** (`Insufficient USD or Diem balance`). Pronto para uso imediato via `--provider venice` assim que houver saldo USD ou Diem na conta.
 
-## 11. OpenCode Zen/Go (`opencode`) & Freebuff CLI
+## 11. Command Code Goat (`https://api.commandcode.ai/provider/v1`) — Uso Estrito
+
+> **TRAVA ESTRITA EM CÓDIGO**: O provedor `commandcode` aceita **exclusivamente** o modelo `deepseek/deepseek-v4.1-flash`. Qualquer outro `--model` passado com `--provider commandcode` é rejeitado imediatamente com `exit code 2`.
+
+| Model ID exato | Provedor | Latência medida | Timeout | Bizu de Uso (Especialidade) |
+| :--- | :--- | :--- | :--- | :--- |
+| `deepseek/deepseek-v4.1-flash` | `commandcode` | `1.61s` | `600s` | **Padrão `--task code`** e fallback em `summarize`/`fast-cloud`/`reason`/`fallback-cloud`. |
+
+## 12. OpenCode Zen/Go (`opencode`) & Freebuff CLI
 
 - **OpenCode Zen (`opencode`)**: A chave `OPENCODE_API_KEY_1` e o endpoint `https://opencode.ai/zen/v1` estão ativos (`39` modelos listados em `/models`, incluindo `big-pickle`, `beam-free`, `mimo-v2.6-flash-free`, `deepseek-v4.1-flash-free`, `flint-40b-free`, `nemotron-3.5-super-vl-free`, `jev-1.13-free`, `nemotron-3.5-lightning-free`). No teste ao vivo de `2026-11-21`, os modelos `-free` retornaram `HTTP 429 FreeUsageLimitError` (cota gratuita atingida na conta) e os modelos pagos retornaram `HTTP 402 Insufficient balance`. A rota `--task opencode-go` tenta `opencode/big-pickle` e faz **fallback automático** para `openrouter/free` → `ollama/qwen3.5:4b`.
 - **Freebuff CLI (`freebuff`)**: Quando instalado globalmente via npm (`freebuff`), `freebuff --help` confirma apenas uso interativo (`login`, `--continue`, `--cwd`, `--trust-agents`), **sem flag headless/não-interativa** (`-p` / `--print`). Não integrado como worker CLI em `delegate_llm.py`.
 
-## 12. Indisponíveis / Deprecados na Conta (NÃO CHAMAR)
+## 13. Indisponíveis / Deprecados na Conta (NÃO CHAMAR)
 
 - **Groq (`404`)**: `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `minimaxai/minimax-m2.7`, `meta-llama/muse-spark-open`.
 - **Cerebras (`404`)**: `llama3.1-8b`, `llama-3.3-70b`, `qwen-3-32b`, `zai-glm-4.7`.

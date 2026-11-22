@@ -25,6 +25,7 @@ HEAVY_MODEL_RE = re.compile(r"(?:^|[:\-_])(1[4-9]|[2-9]\d|\d{3,})b(?:$|[:\-_])",
 OLLAMA_LOCK_PATH = Path.home() / ".llm-router-ollama.lock"
 OLLAMA_LOCK_MAX_AGE_SEC = 600
 RETRYABLE_HTTP_CODES = {401, 403, 408, 429, 500, 502, 503, 504}
+COMMANDCODE_ALLOWED_MODEL = "deepseek/deepseek-v4.1-flash"
 
 
 class OllamaBusyError(RuntimeError):
@@ -33,9 +34,13 @@ class OllamaBusyError(RuntimeError):
 
 _SUMMARIZE_CASCADE: list[tuple[str, str]] = [
     ("groq", "qwen/qwen3.8-27b"),
-    ("gemini", "gemini-3-flash-preview"),
-    ("openrouter", "openrouter/free"),
+    ("groq", "openai/gpt-oss-120b"),
     ("cloudflare", "@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
+    ("openrouter", "openrouter/free"),
+    ("openference", "DeepSeek-V4.1-Flash-1017-Free"),
+    ("commandcode", COMMANDCODE_ALLOWED_MODEL),
+    ("github", "openai/gpt-4.1-mini"),
+    ("gemini", "gemini-3-flash-preview"),
     ("ollama", "qwen3.5:4b"),
     ("cerebras", "gpt-oss-120b"),
 ]
@@ -44,11 +49,13 @@ TASK_CASCADES: dict[str, list[tuple[str, str]]] = {
     "summarize": list(_SUMMARIZE_CASCADE),
     "general": list(_SUMMARIZE_CASCADE),
     "code": [
+        ("commandcode", COMMANDCODE_ALLOWED_MODEL),
         ("groq", "qwen/qwen3.8-27b"),
         ("cloudflare", "@cf/qwen/qwen2.5-coder-32b-instruct"),
         ("github", "openai/gpt-4.1-mini"),
-        ("openference", "DeepSeek-V4.1-Flash-1017-Free"),
         ("openrouter", "openrouter/free"),
+        ("openference", "DeepSeek-V4.1-Flash-1017-Free"),
+        ("gemini", "gemini-3-flash-preview"),
         ("ollama", "qwen2.5-coder:7b"),
         ("cerebras", "qwen-3.8-27b"),
     ],
@@ -61,15 +68,19 @@ TASK_CASCADES: dict[str, list[tuple[str, str]]] = {
     ],
     "fast-cloud": [
         ("groq", "qwen/qwen3.8-27b"),
+        ("cloudflare", "@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
         ("openrouter", "openrouter/free"),
+        ("openference", "DeepSeek-V4.1-Flash-1017-Free"),
+        ("commandcode", COMMANDCODE_ALLOWED_MODEL),
         ("gemini", "gemini-3.1-flash-lite-preview"),
         ("ollama", "qwen3.5:4b"),
         ("cerebras", "gpt-oss-120b"),
     ],
     "batch-cloud": [
         ("groq", "openai/gpt-oss-120b"),
-        ("gemini", "gemini-3-flash-preview"),
+        ("cloudflare", "@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
         ("openrouter", "openrouter/free"),
+        ("gemini", "gemini-3-flash-preview"),
         ("ollama", "qwen3.5:4b"),
         ("cerebras", "gpt-oss-120b"),
     ],
@@ -89,10 +100,11 @@ TASK_CASCADES: dict[str, list[tuple[str, str]]] = {
     "reason": [
         ("nvidia", "nvidia/nemotron-3-ultra-550b-a55b"),
         ("nvidia", "mistralai/mistral-large-4-1t-a52b"),
-        ("gemini", "gemini-3-flash-preview"),
-        ("openference", "GLM-5.3-Flash-Free"),
         ("github", "deepseek/deepseek-r1"),
-        ("openrouter", "nvidia/nemotron-3-ultra-550b-a55b:free"),
+        ("commandcode", COMMANDCODE_ALLOWED_MODEL),
+        ("openference", "GLM-5.3-Flash-Free"),
+        ("venice", "venice-uncensored"),
+        ("gemini", "gemini-3-flash-preview"),
         ("ollama", "qwen3.6:35b-a3b"),
         ("cerebras", "gpt-oss-120b"),
     ],
@@ -101,6 +113,7 @@ TASK_CASCADES: dict[str, list[tuple[str, str]]] = {
         ("openference", "DeepSeek-V4.1-Flash-1017-Free"),
         ("github", "openai/gpt-4.1"),
         ("cloudflare", "@cf/qwen/qwen2.5-coder-32b-instruct"),
+        ("commandcode", COMMANDCODE_ALLOWED_MODEL),
         ("opencode", "big-pickle"),
         ("ollama", "qwen3.5:4b"),
         ("cerebras", "gpt-oss-120b"),
@@ -119,11 +132,12 @@ DEFAULT_PROVIDER_MODELS = {
     "cerebras": "gpt-oss-120b",
     "gemini": "gemini-3-flash-preview",
     "cloudflare": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-    "github": "openai/gpt-4o-mini",
+    "github": "openai/gpt-4.1-mini",
     "openrouter": "openrouter/free",
     "opencode": "big-pickle",
     "openference": "DeepSeek-V4.1-Flash-1017-Free",
     "venice": "venice-uncensored",
+    "commandcode": COMMANDCODE_ALLOWED_MODEL,
     "freebuff": "freebuff-tui",
 }
 
@@ -140,8 +154,112 @@ ALL_PROVIDERS = [
     "opencode",
     "openference",
     "venice",
+    "commandcode",
     "freebuff",
 ]
+
+MODEL_FLEET_CATALOG: dict[str, dict] = {
+    "groq": {
+        "role": "Inferência ultrarrápida em nuvem (resumos, código, lotes)",
+        "models": [
+            {"id": "qwen/qwen3.8-27b", "use": "Código, refatoração e resumos rápidos (0.25s)"},
+            {"id": "openai/gpt-oss-120b", "use": "Raciocínio rápido e lotes (0.41s)"},
+            {"id": "openai/gpt-oss-20b", "use": "Classificação e extração leve (0.31s)"},
+        ],
+    },
+    "cloudflare": {
+        "role": "Workers AI na borda (resumos, código 32B, Llama 3.3 70B)",
+        "models": [
+            {"id": "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "use": "Resumos e texto geral 70B FP8 (0.41s)"},
+            {"id": "@cf/qwen/qwen2.5-coder-32b-instruct", "use": "Código, diffs e testes 32B (0.52s)"},
+            {"id": "@cf/openai/gpt-oss-120b", "use": "Raciocínio 120B (1.23s)"},
+        ],
+    },
+    "commandcode": {
+        "role": "Uso ESTRITO apenas para DeepSeek V4.1 Flash (código, resumos, raciocínio)",
+        "models": [
+            {"id": COMMANDCODE_ALLOWED_MODEL, "use": "Único modelo permitido neste provedor (1.61s)"},
+        ],
+    },
+    "github": {
+        "role": "GitHub Models (GPT-4.1, GPT-4o-mini, DeepSeek R1, Llama 3.3 70B)",
+        "models": [
+            {"id": "openai/gpt-4.1-mini", "use": "Código leve, instruções estruturadas e resumos (<1s)"},
+            {"id": "openai/gpt-4.1", "use": "Raciocínio e código de alta precisão (<1s)"},
+            {"id": "openai/gpt-4o-mini", "use": "Tarefas rápidas gerais (<1s)"},
+            {"id": "deepseek/deepseek-r1", "use": "Raciocínio passo a passo (<1s)"},
+            {"id": "meta/llama-3.3-70b-instruct", "use": "Síntese e análise geral 70B (<1s)"},
+        ],
+    },
+    "openrouter": {
+        "role": "Meta-roteador gratuito e modelos :free",
+        "models": [
+            {"id": "openrouter/free", "use": "Roteador automático de modelos gratuitos (2.19s)"},
+            {"id": "nvidia/nemotron-3-ultra-550b-a55b:free", "use": "550B MoE gratuito (0.59s)"},
+            {"id": "nvidia/nemotron-3.5-super-vl:free", "use": "120B MoE gratuito (0.75s)"},
+            {"id": "baidu/ernie-5.5-flash-preview:free", "use": "Flash gratuito para texto/resumos (1.27s)"},
+        ],
+    },
+    "openference": {
+        "role": "Streaming SSE gratuito (DeepSeek V4.1 Flash / GLM-5.3 Flash)",
+        "models": [
+            {"id": "DeepSeek-V4.1-Flash-1017-Free", "use": "Código e resumos rápidos via SSE (2.05s)"},
+            {"id": "GLM-5.3-Flash-Free", "use": "Raciocínio GLM via SSE (2.80s)"},
+        ],
+    },
+    "nvidia": {
+        "role": "Raciocínio pesado, arquitetura e segunda opinião (timeout 600s)",
+        "models": [
+            {"id": "nvidia/nemotron-3-ultra-550b-a55b", "use": "Flagship 550B MoE arquitetura/auditoria (1.31s)"},
+            {"id": "mistralai/mistral-large-4-1t-a52b", "use": "1T MoE revisão profunda (2.73s)"},
+            {"id": "poolside/laguna-xs-2.1", "use": "Engenharia de software e patches (0.86s)"},
+            {"id": "nvidia/nemotron-3.5-super-vl-120b-a12b", "use": "120B MoE análise geral (0.88s)"},
+            {"id": "nvidia/nemotron-3.5-lightning-30b-a3b", "use": "Análises médias rápidas (1.38s)"},
+            {"id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning", "use": "Raciocínio estruturado (1.66s)"},
+            {"id": "nvidia/nemotron-3.5-bolt-e4b", "use": "Formatação e triagem ultraleve (0.52s)"},
+            {"id": "google/gemma-4-31b-it", "use": "Redação e documentação (29.56s)"},
+            {"id": "moonshotai/kimi-k3.1-pro", "use": "Contexto longo e segunda opinião (42.98s)"},
+            {"id": "stepfun-ai/step-5-preview", "use": "Raciocínio avançado (43.72s)"},
+            {"id": "z-ai/glm-5.3-flash", "use": "GLM lento / cold-start (usar --timeout 600)"},
+        ],
+    },
+    "gemini": {
+        "role": "Contexto gigante (1M+ tokens) com pool de 5 chaves",
+        "models": [
+            {"id": "gemini-3-flash-preview", "use": "Padrão --task long-ctx (1.02s)"},
+            {"id": "gemini-3.1-flash-lite-preview", "use": "Alternativa leve para contexto longo (1.00s)"},
+        ],
+    },
+    "venice": {
+        "role": "Zero Data Retention (requer créditos USD/Diem; HTTP 402 sem saldo)",
+        "models": [
+            {"id": "venice-uncensored", "use": "Privacidade Zero Data Retention (quando houver saldo)"},
+        ],
+    },
+    "opencode": {
+        "role": "OpenCode Zen/Go (fallback automático para openrouter se cota -free esgotar)",
+        "models": [
+            {"id": "big-pickle", "use": "Modelo gratuito OpenCode Zen"},
+            {"id": "beam-free", "use": "Modelo gratuito OpenCode Zen"},
+        ],
+    },
+    "ollama": {
+        "role": "Fallback local offline / dados sensíveis / embeddings (8 GB VRAM, 1 por vez)",
+        "models": [
+            {"id": "qwen3.5:4b", "use": "Resumos offline / dados privados"},
+            {"id": "qwen2.5-coder:7b", "use": "Código e testes offline"},
+            {"id": "qwen3-embedding:0.6b", "use": "Padrão --task embed (1024 dims)"},
+            {"id": "qwen3.6:35b-a3b", "use": "Padrão --task local-heavy e fallback de reason"},
+        ],
+    },
+    "cerebras": {
+        "role": "Último recurso absoluto pós-Ollama (ou --provider cerebras explícito)",
+        "models": [
+            {"id": "gpt-oss-120b", "use": "Último recurso geral (0.34s)"},
+            {"id": "qwen-3.8-27b", "use": "Último recurso código/texto (0.25s)"},
+        ],
+    },
+}
 
 
 def load_env_file(env_path: Path) -> None:
@@ -555,6 +673,8 @@ def resolve_provider_spec(provider: str) -> tuple[list[str], str, dict[str, str]
         return (["https://api.openference.com/v1/chat/completions"], "OPENFERENCE_API_KEY", {})
     if provider == "venice":
         return (["https://api.venice.ai/api/v1/chat/completions"], "VENICE_API_KEY", {})
+    if provider == "commandcode":
+        return (["https://api.commandcode.ai/provider/v1/chat/completions"], "COMMANDCODE_API_KEY", {})
     raise ValueError(f"Provedor não suportado: {provider}")
 
 
@@ -654,6 +774,8 @@ def execute_provider(
     wait_ollama: bool = False,
 ) -> str:
     """Execute a single provider/model target."""
+    if provider == "commandcode" and model != COMMANDCODE_ALLOWED_MODEL:
+        raise ValueError("Provider 'commandcode' is strictly restricted to DeepSeek V4.1 Flash")
     if provider == "ollama":
         with ollama_execution_lock(model, wait=wait_ollama, wait_timeout=min(timeout, 300)):
             if task == "embed" and not explicit_model:
@@ -735,12 +857,42 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Inspeciona lockfile e /api/ps do Ollama e imprime status em JSON.",
     )
+    parser.add_argument(
+        "--list-models",
+        action="store_true",
+        help="Lista todos os provedores configurados, modelos disponíveis e especialidades.",
+    )
     return parser.parse_args()
 
 
+def load_env_candidates() -> None:
+    """Load env files in priority order without overriding already-set variables."""
+    skill_root = Path(__file__).resolve().parent.parent
+    candidates = [
+        Path.cwd() / ".env",
+        skill_root / ".env",
+        Path.home() / ".llm-router.env",
+    ]
+    seen: set[Path] = set()
+    for path in candidates:
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        load_env_file(path)
+
+
 def main() -> int:
-    load_env_file(Path.home() / ".llm-router.env")
+    load_env_candidates()
     args = parse_args()
+
+    if args.list_models:
+        print(json.dumps(MODEL_FLEET_CATALOG, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.provider == "commandcode" and args.model and args.model != COMMANDCODE_ALLOWED_MODEL:
+        print("Provider 'commandcode' is strictly restricted to DeepSeek V4.1 Flash", file=sys.stderr)
+        return 2
 
     if args.check_ollama:
         print(json.dumps(check_ollama_status(), ensure_ascii=False, indent=2))
