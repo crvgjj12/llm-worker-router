@@ -1,0 +1,15 @@
+# Credenciais e ambiente
+.env
+.env.*
+!.env.example
+.llm-router.env
+
+# Locks e caches Python
+*.lock
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
