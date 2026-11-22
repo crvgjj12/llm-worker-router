@@ -39,6 +39,46 @@ Consulte o catálogo completo de modelos validados e latências em [references/m
 
 3. (Opcional, para GPUs de 8 GB) Configure no sistema `OLLAMA_MAX_LOADED_MODELS=1` e `OLLAMA_NUM_PARALLEL=1`.
 
+## Modelos Locais (Ollama): Instalação e Por que Foram Escolhidos
+
+O Ollama atua como camada **offline/privada** (`--provider ollama`), provedor de **embeddings** (`--task embed`) e **fallback final** caso todos os provedores em nuvem fiquem indisponíveis.
+
+### 1. Como instalar o Ollama
+
+- **Windows**:
+  ```powershell
+  winget install Ollama.Ollama
+  ```
+  *(Ou baixe o instalador em [ollama.com/download](https://ollama.com/download).)*
+- **Linux**:
+  ```bash
+  curl -fsSL https://ollama.com/install.sh | sh
+  ```
+- **macOS**:
+  ```bash
+  brew install --cask ollama
+  ```
+
+### 2. Como baixar os modelos locais do projeto
+
+Após instalar e iniciar o serviço do Ollama (`ollama serve`), baixe os 4 modelos configurados no roteador:
+
+```bash
+ollama pull qwen3.5:4b
+ollama pull qwen2.5-coder:7b
+ollama pull qwen3-embedding:0.6b
+ollama pull qwen3.6:35b-a3b
+```
+
+### 3. Por que cada modelo local foi escolhido
+
+| Modelo | Papel no Roteador | Por que foi escolhido |
+| :--- | :--- | :--- |
+| `qwen3.5:4b` | Fallback local de `summarize`, `fast-cloud`, `batch-cloud`, `long-ctx`, `fallback-cloud` e `--provider ollama` | Modelo leve (4B) com baixíssimo consumo de VRAM (~3–4 GB), ideal para resumir logs e documentos rapidamente sem saturar GPUs de 8 GB. |
+| `qwen2.5-coder:7b` | Fallback local de `code` e geração de código offline | Especializado em programação (código, refatoração, docstrings e testes unitários) e cabe com folga em 8 GB de VRAM em quantização padrão. |
+| `qwen3-embedding:0.6b` | Padrão exclusivo de `--task embed` | Gera vetores de `1024` dimensões com pegada mínima de memória (~0.6B), permitindo indexação semântica local quase instantânea. |
+| `qwen3.6:35b-a3b` | Padrão de `--task local-heavy` e fallback local de `reason` | Arquitetura MoE (*Mixture-of-Experts* com apenas 3B de parâmetros ativos por token sobre 35B totais), entregando raciocínio local de alta qualidade com uso viável em máquinas de 8 GB VRAM + 32 GB RAM. |
+
 ## Instalação nos Agentes
 
 Copie a pasta `llm-worker-router` para o diretório global de skills do(s) seu(s) agente(s):
